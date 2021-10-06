@@ -50,8 +50,9 @@ public class StateTransitionController<T extends StateTransitionController.State
      * <p>You should try to not use this method, as it does not provide any thread safety for the code that follows the call.</p>
      */
     public void assertInState(T expected) {
-        if (state.state != expected) {
-            throw new IllegalStateException(displayName.getCapitalizedDisplayName() + " should be in state " + expected + ".");
+        CurrentState<T> current = state;
+        if (current.state != expected) {
+            throw new IllegalStateException(displayName.getCapitalizedDisplayName() + " should be in state " + expected + " but is in " + current.state + ".");
         }
     }
 
@@ -239,7 +240,7 @@ public class StateTransitionController<T extends StateTransitionController.State
         }
 
         public CurrentState<T> failed(ExecutionResult<?> failure) {
-            return new Failed<>(this, failure);
+            return new Failed<>(displayName, state, failure);
         }
 
         public RuntimeException rethrow() {
@@ -364,8 +365,8 @@ public class StateTransitionController<T extends StateTransitionController.State
     private static class Failed<T> extends CurrentState<T> {
         final ExecutionResult<?> failure;
 
-        public Failed(CurrentState<T> failedIn, ExecutionResult<?> failure) {
-            super(failedIn.displayName, failedIn.state);
+        public Failed(DisplayName displayName, T state, ExecutionResult<?> failure) {
+            super(displayName, state);
             this.failure = failure;
         }
 
@@ -412,7 +413,7 @@ public class StateTransitionController<T extends StateTransitionController.State
 
         @Override
         public CurrentState<T> nextState(T toState) {
-            return new Failed<T>(this, failure);
+            return new Failed<T>(displayName, toState, failure);
         }
     }
 

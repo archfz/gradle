@@ -60,7 +60,7 @@ class TestWorkerLeaseService implements WorkerLeaseService {
     }
 
     @Override
-    void runAsLightWeightWorker(WorkerLease sharedLease, Runnable action) {
+    void runAsWorkerThread(WorkerLease lease, Runnable action) {
         action.run()
     }
 
