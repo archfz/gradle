@@ -16,6 +16,7 @@
 
 package org.gradle.configurationcache.isolated
 
+import groovy.test.NotYetImplemented
 import org.gradle.test.fixtures.file.TestFile
 import org.gradle.test.fixtures.server.http.BlockingHttpServer
 import org.junit.Rule
@@ -58,6 +59,7 @@ class IsolatedProjectsToolingApiParallelConfigurationIntegrationTest extends Abs
         model[2].message == "It works from project :b"
     }
 
+    @NotYetImplemented
     def "projects are configured in parallel when projects use plugins from included builds and project scoped model is queried concurrently"() {
         withSomeToolingModelBuilderPluginInChildBuild("plugins", """
             ${server.callFromBuildUsingExpression("'model-' + project.name")}

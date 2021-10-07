@@ -26,12 +26,19 @@ import java.util.Collection;
 @ServiceScope(Scopes.BuildSession.class)
 public interface ProjectLeaseRegistry {
     /**
+     * Get the lock for all projects. This lock provides exclusive access to all projects. While this lock is held, no project locks can be held.
+     */
+    ResourceLock getAllProjectsLock();
+
+    /**
      * Get a lock for the specified project.
      */
     ResourceLock getProjectLock(Path buildIdentityPath, Path projectIdentityPath);
 
     /**
-     * Returns any projects locks currently held by this thread.
+     * Returns any project locks currently held by this thread.
+     *
+     * Note: may contain either locks for specific projects (returned by {@link #getProjectLock(Path, Path)}) or the lock for all projects (returned by {@link #getAllProjectsLock()}.
      */
     Collection<? extends ResourceLock> getCurrentProjectLocks();
 

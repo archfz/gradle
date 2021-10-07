@@ -30,8 +30,13 @@ class TestWorkerLeaseService implements WorkerLeaseService {
     }
 
     @Override
+    ResourceLock getAllProjectsLock() {
+        throw new UnsupportedOperationException()
+    }
+
+    @Override
     Collection<? extends ResourceLock> getCurrentProjectLocks() {
-        return null
+        throw new UnsupportedOperationException()
     }
 
     @Override

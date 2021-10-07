@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 the original author or authors.
+ * Copyright 2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,16 +16,8 @@
 
 package org.gradle.internal.resources;
 
-public class ProjectLock extends ExclusiveAccessResourceLock {
-    private final ResourceLock allProjectsLock;
+public interface ResourceLockContainer {
+    void lockAcquired(ResourceLock lock);
 
-    public ProjectLock(String displayName, ResourceLockCoordinationService coordinationService, ResourceLockContainer owner, ResourceLock allProjectsLock) {
-        super(displayName, coordinationService, owner);
-        this.allProjectsLock = allProjectsLock;
-    }
-
-    @Override
-    protected boolean canAcquire() {
-        return !allProjectsLock.isLocked();
-    }
+    void lockReleased(ResourceLock lock);
 }

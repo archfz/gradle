@@ -18,7 +18,6 @@ package org.gradle.internal.work;
 
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-import org.gradle.api.Action;
 import org.gradle.api.Describable;
 import org.gradle.api.Transformer;
 import org.gradle.api.specs.Spec;
@@ -31,8 +30,10 @@ import org.gradle.internal.resources.AbstractResourceLockRegistry;
 import org.gradle.internal.resources.AbstractTrackedResourceLock;
 import org.gradle.internal.resources.DefaultResourceLockCoordinationService;
 import org.gradle.internal.resources.ProjectLock;
+import org.gradle.internal.resources.ProjectLockRegistry;
 import org.gradle.internal.resources.ProjectLockStatistics;
 import org.gradle.internal.resources.ResourceLock;
+import org.gradle.internal.resources.ResourceLockContainer;
 import org.gradle.internal.resources.ResourceLockCoordinationService;
 import org.gradle.internal.resources.ResourceLockState;
 import org.gradle.internal.time.Time;
@@ -146,6 +147,11 @@ public class DefaultWorkerLeaseService implements WorkerLeaseService, Stoppable 
     }
 
     @Override
+    public ResourceLock getAllProjectsLock() {
+        return projectLockRegistry.getAllProjectsLock();
+    }
+
+    @Override
     public ResourceLock getProjectLock(Path buildIdentityPath, Path projectIdentityPath) {
         return projectLockRegistry.getResourceLock(buildIdentityPath, projectIdentityPath);
     }
@@ -157,7 +163,7 @@ public class DefaultWorkerLeaseService implements WorkerLeaseService, Stoppable 
 
     @Override
     public void releaseCurrentProjectLocks() {
-        final Iterable<? extends ResourceLock> projectLocks = getCurrentProjectLocks();
+        Collection<? extends ResourceLock> projectLocks = getCurrentProjectLocks();
         releaseLocks(projectLocks);
     }
 
@@ -172,7 +178,7 @@ public class DefaultWorkerLeaseService implements WorkerLeaseService, Stoppable 
 
     @Override
     public <T> T withoutProjectLock(Factory<T> factory) {
-        final Iterable<? extends ResourceLock> projectLocks = getCurrentProjectLocks();
+        Collection<? extends ResourceLock> projectLocks = getCurrentProjectLocks();
         return withoutLocks(projectLocks, factory);
     }
 
@@ -341,32 +347,6 @@ public class DefaultWorkerLeaseService implements WorkerLeaseService, Stoppable 
         return allLocked.get();
     }
 
-    private static class ProjectLockRegistry extends AbstractResourceLockRegistry<Path, ProjectLock> {
-        private final boolean parallelEnabled;
-
-        public ProjectLockRegistry(ResourceLockCoordinationService coordinationService, boolean parallelEnabled) {
-            super(coordinationService);
-            this.parallelEnabled = parallelEnabled;
-        }
-
-        public boolean getAllowsParallelExecution() {
-            return parallelEnabled;
-        }
-
-        ResourceLock getResourceLock(Path buildIdentityPath, Path projectIdentityPath) {
-            return getResourceLock(parallelEnabled ? projectIdentityPath : buildIdentityPath);
-        }
-
-        ResourceLock getResourceLock(final Path lockPath) {
-            return getOrRegisterResourceLock(lockPath, new ResourceLockProducer<Path, ProjectLock>() {
-                @Override
-                public ProjectLock create(Path projectPath, ResourceLockCoordinationService coordinationService, Action<ResourceLock> lockAction, Action<ResourceLock> unlockAction) {
-                    return new ProjectLock(lockPath.getPath(), coordinationService, lockAction, unlockAction);
-                }
-            });
-        }
-    }
-
     private class WorkerLeaseLockRegistry extends AbstractResourceLockRegistry<String, DefaultWorkerLease> {
         WorkerLeaseLockRegistry(ResourceLockCoordinationService coordinationService) {
             super(coordinationService);
@@ -376,8 +356,8 @@ public class DefaultWorkerLeaseService implements WorkerLeaseService, Stoppable 
             String displayName = parent.getDisplayName() + '.' + workerId;
             return getOrRegisterResourceLock(displayName, new ResourceLockProducer<String, DefaultWorkerLease>() {
                 @Override
-                public DefaultWorkerLease create(String displayName, ResourceLockCoordinationService coordinationService, Action<ResourceLock> lockAction, Action<ResourceLock> unlockAction) {
-                    return new DefaultWorkerLease(displayName, coordinationService, lockAction, unlockAction, parent, ownerThread);
+                public DefaultWorkerLease create(String displayName, ResourceLockCoordinationService coordinationService, ResourceLockContainer owner) {
+                    return new DefaultWorkerLease(displayName, coordinationService, owner, parent, ownerThread);
                 }
             });
         }
@@ -418,8 +398,8 @@ public class DefaultWorkerLeaseService implements WorkerLeaseService, Stoppable 
         int children;
         boolean active;
 
-        public DefaultWorkerLease(String displayName, ResourceLockCoordinationService coordinationService, Action<ResourceLock> lockAction, Action<ResourceLock> unlockAction, LeaseHolder parent, Thread ownerThread) {
-            super(displayName, coordinationService, lockAction, unlockAction);
+        public DefaultWorkerLease(String displayName, ResourceLockCoordinationService coordinationService, ResourceLockContainer owner, LeaseHolder parent, Thread ownerThread) {
+            super(displayName, coordinationService, owner);
             this.parent = parent;
             this.ownerThread = ownerThread;
         }

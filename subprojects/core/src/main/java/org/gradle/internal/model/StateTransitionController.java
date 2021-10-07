@@ -80,6 +80,7 @@ public class StateTransitionController<T extends StateTransitionController.State
         try {
             return supplier.get();
         } catch (Throwable t) {
+            // TODO - remove the need for locking here
             synchronizer.withLock(() -> {
                 state = state.failed(ExecutionResult.failed(t));
             });
@@ -412,12 +413,12 @@ public class StateTransitionController<T extends StateTransitionController.State
 
         @Override
         public CurrentState<T> failed(ExecutionResult<?> failure) {
-            throw new IllegalStateException();
+            return new Failed<>(displayName, state, this.failure.withFailures(failure.asFailure()));
         }
 
         @Override
         public CurrentState<T> nextState(T toState) {
-            return new Failed<T>(displayName, toState, failure);
+            return new Failed<>(displayName, toState, failure);
         }
     }
 
