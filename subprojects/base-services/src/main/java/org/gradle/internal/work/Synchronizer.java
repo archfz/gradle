@@ -16,7 +16,7 @@
 
 package org.gradle.internal.work;
 
-import com.google.common.base.Supplier;
+import org.gradle.internal.Factory;
 
 public interface Synchronizer {
     /**
@@ -31,5 +31,5 @@ public interface Synchronizer {
      *
      * Fails if the current thread is already holding the resource lock. May release project locks prior to blocking, as per {@link WorkerLeaseService#blocking(Runnable)}.
      */
-    <T> T withLock(Supplier<T> action);
+    <T> T withLock(Factory<T> action);
 }

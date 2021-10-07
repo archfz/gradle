@@ -328,13 +328,13 @@ public class StateTransitionController<T extends StateTransitionController.State
 
         @Override
         public void assertInState(T expected) {
-            throw new IllegalStateException("Expected to be in state " + expected + " but is in state " + state + " and transitioning to " + targetState + ".");
+            throw new IllegalStateException("Expected " + displayName.getDisplayName() + " to be in state " + expected + " but is in state " + state + " and transitioning to " + targetState + ".");
         }
 
         @Override
         public void assertNotInState(T forbidden) {
             if (targetState == forbidden) {
-                throw new IllegalStateException("Should not be in state " + forbidden + " but is in state " + state + " and transitioning to " + targetState + ".");
+                throw new IllegalStateException(displayName.getCapitalizedDisplayName() + " should not be in state " + forbidden + " but is in state " + state + " and transitioning to " + targetState + ".");
             }
             fromState.assertNotInState(forbidden);
         }
@@ -342,9 +342,9 @@ public class StateTransitionController<T extends StateTransitionController.State
         @Override
         public void assertCanTransition(T fromState, T toState) {
             if (targetState == toState) {
-                throw new IllegalStateException("Cannot transition to state " + toState + " as already transitioning to this state.");
+                throw new IllegalStateException("Cannot transition " + displayName.getDisplayName() + " to state " + toState + " as already transitioning to this state.");
             } else {
-                throw new IllegalStateException("Cannot transition to state " + toState + " as already transitioning to state " + targetState + ".");
+                throw new IllegalStateException("Cannot transition " + displayName.getDisplayName() + " to state " + toState + " as already transitioning to state " + targetState + ".");
             }
         }
 
@@ -371,7 +371,7 @@ public class StateTransitionController<T extends StateTransitionController.State
         }
 
         public void assertNotFailed() {
-            throw new IllegalStateException("Cannot use this object as a previous transition failed.");
+            throw new IllegalStateException("Cannot use " + displayName.getDisplayName() + " as a previous transition failed.");
         }
 
         @Override

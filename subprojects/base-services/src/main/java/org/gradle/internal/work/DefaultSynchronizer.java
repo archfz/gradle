@@ -16,7 +16,7 @@
 
 package org.gradle.internal.work;
 
-import com.google.common.base.Supplier;
+import org.gradle.internal.Factory;
 import org.gradle.internal.UncheckedException;
 
 class DefaultSynchronizer implements Synchronizer {
@@ -38,10 +38,10 @@ class DefaultSynchronizer implements Synchronizer {
     }
 
     @Override
-    public <T> T withLock(Supplier<T> action) {
+    public <T> T withLock(Factory<T> action) {
         Thread previous = takeOwnership();
         try {
-            return action.get();
+            return action.create();
         } finally {
             releaseOwnership(previous);
         }
