@@ -215,12 +215,12 @@ public class DefaultPlanExecutor implements PlanExecutor {
 
             Node selectedNode = selected.get();
             if (selectedNode != null) {
-                execute(selectedNode, workerLease, nodeExecutor);
+                execute(selectedNode, nodeExecutor);
             }
             return nodesRemaining.get();
         }
 
-        private void execute(final Node selected, final WorkerLease workerLease, Action<Node> nodeExecutor) {
+        private void execute(final Node selected, Action<Node> nodeExecutor) {
             try {
                 if (!selected.isComplete()) {
                     try {
@@ -232,6 +232,7 @@ public class DefaultPlanExecutor implements PlanExecutor {
             } finally {
                 coordinationService.withStateLock(state -> {
                     executionPlan.finishedExecuting(selected);
+                    coordinationService.notifyStateChange();
                     return FINISHED;
                 });
             }
