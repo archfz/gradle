@@ -97,9 +97,7 @@ public class DefaultWorkerLeaseService implements WorkerLeaseService, Stoppable 
 
     @Override
     public DefaultWorkerLease getWorkerLease() {
-        Collection<? extends ResourceLock> operations = workerLeaseLockRegistry.getResourceLocksByCurrentThread();
-        LeaseHolder parent = operations.isEmpty() ? root : (DefaultWorkerLease) operations.toArray()[operations.size() - 1];
-        return getWorkerLease(parent);
+        return getWorkerLease(root);
     }
 
     @Override

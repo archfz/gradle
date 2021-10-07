@@ -33,11 +33,11 @@ import org.gradle.internal.work.WorkerLeaseService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.util.Collection;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicLong;
 
-import static org.gradle.internal.resources.DefaultResourceLockCoordinationService.unlock;
 import static org.gradle.internal.resources.ResourceLockState.Disposition.FINISHED;
 import static org.gradle.internal.resources.ResourceLockState.Disposition.RETRY;
 
@@ -68,8 +68,8 @@ public class DefaultPlanExecutor implements PlanExecutor {
         ManagedExecutor executor = executorFactory.create("Execution worker for '" + executionPlan.getDisplayName() + "'");
         try {
             WorkerLease currentWorkerLease = workerLeaseService.getCurrentWorkerLease();
-            startAdditionalWorkers(executionPlan, nodeExecutor, executor, currentWorkerLease);
-            new ExecutorWorker(executionPlan, nodeExecutor, currentWorkerLease, cancellationToken, coordinationService).run();
+            startAdditionalWorkers(executionPlan, nodeExecutor, executor);
+            new ExecutorWorker(executionPlan, nodeExecutor, currentWorkerLease, cancellationToken, coordinationService, workerLeaseService).run();
             awaitCompletion(executionPlan, failures);
         } finally {
             executor.stop();
@@ -90,27 +90,36 @@ public class DefaultPlanExecutor implements PlanExecutor {
         });
     }
 
-    private void startAdditionalWorkers(ExecutionPlan executionPlan, Action<? super Node> nodeExecutor, Executor executor, WorkerLease parentWorkerLease) {
+    private void startAdditionalWorkers(ExecutionPlan executionPlan, Action<? super Node> nodeExecutor, Executor executor) {
         LOGGER.debug("Using {} parallel executor threads", executorCount);
 
         for (int i = 1; i < executorCount; i++) {
-            executor.execute(new ExecutorWorker(executionPlan, nodeExecutor, parentWorkerLease.createChild(), cancellationToken, coordinationService));
+            executor.execute(new ExecutorWorker(executionPlan, nodeExecutor, null, cancellationToken, coordinationService, workerLeaseService));
         }
     }
 
     private static class ExecutorWorker implements Runnable {
         private final ExecutionPlan executionPlan;
         private final Action<? super Node> nodeExecutor;
-        private final WorkerLease workerLease;
+        private WorkerLease workerLease;
         private final BuildCancellationToken cancellationToken;
         private final ResourceLockCoordinationService coordinationService;
+        private final WorkerLeaseService workerLeaseService;
 
-        private ExecutorWorker(ExecutionPlan executionPlan, Action<? super Node> nodeExecutor, WorkerLease workerLease, BuildCancellationToken cancellationToken, ResourceLockCoordinationService coordinationService) {
+        private ExecutorWorker(
+            ExecutionPlan executionPlan,
+            Action<? super Node> nodeExecutor,
+            @Nullable WorkerLease workerLease,
+            BuildCancellationToken cancellationToken,
+            ResourceLockCoordinationService coordinationService,
+            WorkerLeaseService workerLeaseService
+        ) {
             this.executionPlan = executionPlan;
             this.nodeExecutor = nodeExecutor;
             this.workerLease = workerLease;
             this.cancellationToken = cancellationToken;
             this.coordinationService = coordinationService;
+            this.workerLeaseService = workerLeaseService;
         }
 
         @Override
@@ -118,6 +127,14 @@ public class DefaultPlanExecutor implements PlanExecutor {
             final AtomicLong busy = new AtomicLong(0);
             Timer totalTimer = Time.startTimer();
             final Timer executionTimer = Time.startTimer();
+
+            boolean releaseLeaseOnCompletion;
+            if (workerLease == null) {
+                workerLease = workerLeaseService.getWorkerLease();
+                releaseLeaseOnCompletion = true;
+            } else {
+                releaseLeaseOnCompletion = false;
+            }
 
             while (true) {
                 boolean nodesRemaining = executeNextNode(workerLease, work -> {
@@ -134,6 +151,21 @@ public class DefaultPlanExecutor implements PlanExecutor {
                     break;
                 }
             }
+
+            coordinationService.withStateLock(resourceLockState -> {
+                if (releaseLeaseOnCompletion && workerLease.isLockedByCurrentThread()) {
+                    workerLease.unlock();
+                    return FINISHED;
+                } else if (!releaseLeaseOnCompletion && !workerLease.isLockedByCurrentThread()) {
+                    if (workerLease.tryLock()) {
+                        return FINISHED;
+                    } else {
+                        return RETRY;
+                    }
+                } else {
+                    return FINISHED;
+                }
+            });
 
             long total = totalTimer.getElapsedMillis();
 
@@ -200,7 +232,7 @@ public class DefaultPlanExecutor implements PlanExecutor {
             } finally {
                 coordinationService.withStateLock(state -> {
                     executionPlan.finishedExecuting(selected);
-                    return unlock(workerLease).transform(state);
+                    return FINISHED;
                 });
             }
         }
