@@ -29,25 +29,25 @@ class DefaultSynchronizer implements Synchronizer {
 
     @Override
     public void withLock(Runnable action) {
-        takeOwnership();
+        Thread previous = takeOwnership();
         try {
             action.run();
         } finally {
-            releaseOwnership();
+            releaseOwnership(previous);
         }
     }
 
     @Override
     public <T> T withLock(Supplier<T> action) {
-        takeOwnership();
+        Thread previous = takeOwnership();
         try {
             return action.get();
         } finally {
-            releaseOwnership();
+            releaseOwnership(previous);
         }
     }
 
-    private void takeOwnership() {
+    private Thread takeOwnership() {
         final Thread currentThread = Thread.currentThread();
         if (!workerLeaseService.isWorkerThread()) {
             throw new IllegalStateException("The current thread is not registered as a worker thread.");
@@ -55,9 +55,9 @@ class DefaultSynchronizer implements Synchronizer {
         synchronized (this) {
             if (owner == null) {
                 owner = currentThread;
-                return;
+                return null;
             } else if (owner == currentThread) {
-                throw new UnsupportedOperationException("The current thread already holds this lock.");
+                return currentThread;
             }
         }
         workerLeaseService.blocking(new Runnable() {
@@ -75,11 +75,12 @@ class DefaultSynchronizer implements Synchronizer {
                 }
             }
         });
+        return null;
     }
 
-    private void releaseOwnership() {
+    private void releaseOwnership(Thread previousOwner) {
         synchronized (this) {
-            owner = null;
+            owner = previousOwner;
             this.notifyAll();
         }
     }
