@@ -41,7 +41,7 @@ public class IncludedRootBuild implements IncludedBuildInternal {
 
     @Override
     public String getName() {
-        return rootBuild.getLoadedSettings().getRootProject().getName();
+        return rootBuild.getBuildIdentifier().getName();
     }
 
     @Override

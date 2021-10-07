@@ -74,12 +74,15 @@ public class StateTransitionController<T extends StateTransitionController.State
      * <p>You should try to not use this method, as it does not provide full thread safety.</p>
      */
     public <S> S notInStateIgnoreOtherThreads(T forbidden, Supplier<S> supplier) {
-        CurrentState<T> current = this.state;
-        current.assertNotFailed();
+        CurrentState<T> current = state;
+        current.asResult().rethrow();
         current.assertNotInState(forbidden);
         try {
             return supplier.get();
         } catch (Throwable t) {
+            synchronizer.withLock(() -> {
+                state = state.failed(ExecutionResult.failed(t));
+            });
             throw UncheckedException.throwAsUncheckedException(t);
         }
     }
@@ -236,9 +239,6 @@ public class StateTransitionController<T extends StateTransitionController.State
 
         public abstract boolean hasSeenState(T toState);
 
-        public void assertNotFailed() {
-        }
-
         public CurrentState<T> failed(ExecutionResult<?> failure) {
             return new Failed<>(displayName, state, failure);
         }
@@ -370,7 +370,6 @@ public class StateTransitionController<T extends StateTransitionController.State
             this.failure = failure;
         }
 
-        @Override
         public void assertNotFailed() {
             throw new IllegalStateException("Cannot use this object as a previous transition failed.");
         }
@@ -381,13 +380,18 @@ public class StateTransitionController<T extends StateTransitionController.State
         }
 
         @Override
+        public void assertNotInState(T forbidden) {
+            assertNotFailed();
+        }
+
+        @Override
         public void assertCanTransition(T fromState, T toState) {
             assertNotFailed();
         }
 
         @Override
         public boolean hasSeenState(T toState) {
-            throw new IllegalStateException();
+            return false;
         }
 
         @Override
