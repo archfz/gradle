@@ -42,6 +42,7 @@ import org.gradle.util.internal.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
@@ -180,11 +181,28 @@ public class DefaultWorkerLeaseService implements WorkerLeaseService, Stoppable 
     @Override
     public void blocking(Runnable action) {
         if (projectLockRegistry.mayAttemptToChangeLocks()) {
-            // Need to run the action without the project locks
-            withoutProjectLock(action);
-        } else {
-            // Can just run the action, as it is safe to retain the project locks or the current thread is allowed to do whatever it likes
+            final Collection<? extends ResourceLock> projectLocks = getCurrentProjectLocks();
+            if (!projectLocks.isEmpty()) {
+                // Need to run the action without the project locks and the worker lease
+                List<ResourceLock> locks = new ArrayList<ResourceLock>(projectLocks.size() + 1);
+                locks.addAll(projectLocks);
+                locks.add(getCurrentWorkerLease());
+                releaseLocks(locks);
+                try {
+                    action.run();
+                    return;
+                } finally {
+                    acquireLocks(locks);
+                }
+            }
+        }
+        // Else, release only the worker lease
+        List<? extends ResourceLock> locks = Collections.singletonList(getCurrentWorkerLease());
+        releaseLocks(locks);
+        try {
             action.run();
+        } finally {
+            acquireLocks(locks);
         }
     }
 

@@ -67,9 +67,9 @@ public class DefaultPlanExecutor implements PlanExecutor {
     public void process(ExecutionPlan executionPlan, Collection<? super Throwable> failures, Action<Node> nodeExecutor) {
         ManagedExecutor executor = executorFactory.create("Execution worker for '" + executionPlan.getDisplayName() + "'");
         try {
-            WorkerLease parentWorkerLease = workerLeaseService.getCurrentWorkerLease();
-            startAdditionalWorkers(executionPlan, nodeExecutor, executor, parentWorkerLease);
-            new ExecutorWorker(executionPlan, nodeExecutor, parentWorkerLease, cancellationToken, coordinationService).run();
+            WorkerLease currentWorkerLease = workerLeaseService.getCurrentWorkerLease();
+            startAdditionalWorkers(executionPlan, nodeExecutor, executor, currentWorkerLease);
+            new ExecutorWorker(executionPlan, nodeExecutor, currentWorkerLease, cancellationToken, coordinationService).run();
             awaitCompletion(executionPlan, failures);
         } finally {
             executor.stop();
@@ -94,21 +94,21 @@ public class DefaultPlanExecutor implements PlanExecutor {
         LOGGER.debug("Using {} parallel executor threads", executorCount);
 
         for (int i = 1; i < executorCount; i++) {
-            executor.execute(new ExecutorWorker(executionPlan, nodeExecutor, parentWorkerLease, cancellationToken, coordinationService));
+            executor.execute(new ExecutorWorker(executionPlan, nodeExecutor, parentWorkerLease.createChild(), cancellationToken, coordinationService));
         }
     }
 
     private static class ExecutorWorker implements Runnable {
         private final ExecutionPlan executionPlan;
         private final Action<? super Node> nodeExecutor;
-        private final WorkerLease parentWorkerLease;
+        private final WorkerLease workerLease;
         private final BuildCancellationToken cancellationToken;
         private final ResourceLockCoordinationService coordinationService;
 
-        private ExecutorWorker(ExecutionPlan executionPlan, Action<? super Node> nodeExecutor, WorkerLease parentWorkerLease, BuildCancellationToken cancellationToken, ResourceLockCoordinationService coordinationService) {
+        private ExecutorWorker(ExecutionPlan executionPlan, Action<? super Node> nodeExecutor, WorkerLease workerLease, BuildCancellationToken cancellationToken, ResourceLockCoordinationService coordinationService) {
             this.executionPlan = executionPlan;
             this.nodeExecutor = nodeExecutor;
-            this.parentWorkerLease = parentWorkerLease;
+            this.workerLease = workerLease;
             this.cancellationToken = cancellationToken;
             this.coordinationService = coordinationService;
         }
@@ -119,9 +119,8 @@ public class DefaultPlanExecutor implements PlanExecutor {
             Timer totalTimer = Time.startTimer();
             final Timer executionTimer = Time.startTimer();
 
-            WorkerLease childLease = parentWorkerLease.createChild();
             while (true) {
-                boolean nodesRemaining = executeNextNode(childLease, work -> {
+                boolean nodesRemaining = executeNextNode(workerLease, work -> {
                     LOGGER.info("{} ({}) started.", work, Thread.currentThread());
                     executionTimer.reset();
                     nodeExecutor.execute(work);
@@ -171,6 +170,11 @@ public class DefaultPlanExecutor implements PlanExecutor {
                 }
 
                 if (selected.get() == null && nodesRemaining.get()) {
+                    // Release worker lease while waiting
+                    if (workerLease.isLockedByCurrentThread()) {
+                        workerLease.unlock();
+                        coordinationService.notifyStateChange();
+                    }
                     return RETRY;
                 } else {
                     return FINISHED;

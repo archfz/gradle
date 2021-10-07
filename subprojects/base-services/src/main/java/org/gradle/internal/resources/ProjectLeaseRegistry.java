@@ -75,7 +75,8 @@ public interface ProjectLeaseRegistry {
      * Performs some blocking action. If the current thread is allowed to make changes to project locks, then release all locks
      * then run the action and reacquire any locks.
      * If the current thread is not allowed to make changes to the project locks (via {@link #whileDisallowingProjectLockChanges(Factory)},
-     * then it is safe to run the action without releasing the locks.
+     * then it is safe to run the action without releasing the project locks. The worker lease is, however, released prior to running the
+     * action and reacquired at the end.
      */
     void blocking(Runnable action);
 
