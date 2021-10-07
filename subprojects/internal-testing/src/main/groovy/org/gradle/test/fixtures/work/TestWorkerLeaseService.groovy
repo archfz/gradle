@@ -152,10 +152,6 @@ class TestWorkerLeaseService implements WorkerLeaseService {
             }
 
             @Override
-            void assertNotLocked() {
-            }
-
-            @Override
             boolean isLocked() {
                 return false
             }
