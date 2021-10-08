@@ -63,10 +63,10 @@ class DefaultSynchronizer implements Synchronizer {
         workerLeaseService.blocking(new Runnable() {
             @Override
             public void run() {
-                synchronized (this) {
+                synchronized (DefaultSynchronizer.this) {
                     while (owner != null) {
                         try {
-                            this.wait();
+                            DefaultSynchronizer.this.wait();
                         } catch (InterruptedException e) {
                             throw UncheckedException.throwAsUncheckedException(e);
                         }

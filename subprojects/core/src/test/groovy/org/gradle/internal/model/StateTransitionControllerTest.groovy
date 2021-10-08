@@ -30,7 +30,7 @@ class StateTransitionControllerTest extends ConcurrentSpec {
         A, B, C
     }
 
-    final def workerLeaseService = new DefaultWorkerLeaseService(new DefaultResourceLockCoordinationService(), new DefaultParallelismConfiguration())
+    final def workerLeaseService = new DefaultWorkerLeaseService(new DefaultResourceLockCoordinationService(), new DefaultParallelismConfiguration(true, 20))
 
     StateTransitionController<TestState> controller(TestState initialState) {
         return new StateTransitionController<TestState>(Describables.of("<state>"), initialState, workerLeaseService.newResource())
@@ -136,7 +136,7 @@ class StateTransitionControllerTest extends ConcurrentSpec {
         0 * _
     }
 
-    def "cannot attempt to transition while another thread is performing transition"() {
+    def "blocks transition while another thread is performing transition"() {
         def controller = controller(TestState.A)
 
         when:
@@ -144,23 +144,23 @@ class StateTransitionControllerTest extends ConcurrentSpec {
             start {
                 asWorker {
                     controller.transition(TestState.A, TestState.B) {
-                        instant.transitioning
+                        instant.first
                         thread.block()
                     }
                 }
             }
             start {
-                thread.blockUntil.transitioning
+                thread.blockUntil.first
                 asWorker {
-                    controller.transition(TestState.A, TestState.B) {
+                    controller.transition(TestState.B, TestState.C) {
+                        instant.second
                     }
                 }
             }
         }
 
         then:
-        def e = thrown(IllegalStateException)
-        e.message == "Another thread is currently transitioning state from A to B."
+        instant.second > instant.first
     }
 
     def "runs action when not in forbidden state"() {
@@ -321,7 +321,7 @@ class StateTransitionControllerTest extends ConcurrentSpec {
         0 * _
     }
 
-    def "cannot attempt to run action while another thread is performing transition"() {
+    def "blocks attempting to run action while another thread is performing transition"() {
         def controller = controller(TestState.A)
 
         when:
@@ -346,7 +346,7 @@ class StateTransitionControllerTest extends ConcurrentSpec {
 
         then:
         def e = thrown(IllegalStateException)
-        e.message == "Another thread is currently transitioning state from A to B."
+        e.message == "Expected <state> to be in state A but is in state B."
     }
 
     def "runs action for conditional transition when in from state"() {
@@ -456,7 +456,7 @@ class StateTransitionControllerTest extends ConcurrentSpec {
         0 * _
     }
 
-    def "cannot attempt to conditional transition while another thread is performing transition"() {
+    def "blocks conditional transition while another thread is performing transition"() {
         def controller = controller(TestState.A)
 
         when:
@@ -476,11 +476,9 @@ class StateTransitionControllerTest extends ConcurrentSpec {
                     }
                 }
             }
-
         }
 
         then:
-        def e = thrown(IllegalStateException)
-        e.message == "Another thread is currently transitioning <state> state from A to B."
+        noExceptionThrown()
     }
 }

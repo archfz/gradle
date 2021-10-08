@@ -298,34 +298,6 @@ class DefaultProjectStateRegistryTest extends ConcurrentSpec {
         instant.thread2 > instant.thread1
     }
 
-    def "cannot lock all projects while another thread has locked a project"() {
-        given:
-        def build = build("p1", "p2")
-        createRootProject()
-        def state = registry.stateFor(projectId("p1"))
-        createProject(state, project("p1"))
-
-        when:
-        async {
-            workerThread {
-                state.applyToMutableState() {
-                    instant.start
-                    thread.block()
-                    instant.thread1
-                }
-            }
-            workerThread {
-                thread.blockUntil.start
-                registry.withMutableStateOfAllProjects {
-                    instant.thread2
-                }
-            }
-        }
-
-        then:
-        instant.thread2 > instant.thread1
-    }
-
     def "releases lock for all projects while running blocking operation"() {
         given:
         def build = build("p1", "p2")
