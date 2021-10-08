@@ -27,15 +27,12 @@ import org.gradle.internal.isolated.IsolationScheme;
 import org.gradle.internal.operations.BuildOperationExecutor;
 import org.gradle.internal.operations.BuildOperationRef;
 import org.gradle.internal.reflect.Instantiator;
-import org.gradle.internal.resources.ResourceLock;
 import org.gradle.internal.work.AbstractConditionalExecution;
 import org.gradle.internal.work.AsyncWorkCompletion;
 import org.gradle.internal.work.AsyncWorkTracker;
 import org.gradle.internal.work.ConditionalExecutionQueue;
 import org.gradle.internal.work.DefaultConditionalExecutionQueue;
-import org.gradle.internal.work.NoAvailableWorkerLeaseException;
-import org.gradle.internal.work.WorkerLeaseRegistry;
-import org.gradle.internal.work.WorkerLeaseRegistry.WorkerLease;
+import org.gradle.internal.work.WorkerThreadRegistry;
 import org.gradle.process.JavaForkOptions;
 import org.gradle.process.internal.JavaForkOptionsFactory;
 import org.gradle.process.internal.worker.child.WorkerDirectoryProvider;
@@ -63,7 +60,7 @@ public class DefaultWorkerExecutor implements WorkerExecutor {
     private final WorkerFactory isolatedClassloaderWorkerFactory;
     private final WorkerFactory noIsolationWorkerFactory;
     private final JavaForkOptionsFactory forkOptionsFactory;
-    private final WorkerLeaseRegistry workerLeaseRegistry;
+    private final WorkerThreadRegistry workerThreadRegistry;
     private final BuildOperationExecutor buildOperationExecutor;
     private final AsyncWorkTracker asyncWorkTracker;
     private final WorkerDirectoryProvider workerDirectoryProvider;
@@ -75,7 +72,7 @@ public class DefaultWorkerExecutor implements WorkerExecutor {
 
     public DefaultWorkerExecutor(
         WorkerFactory daemonWorkerFactory, WorkerFactory isolatedClassloaderWorkerFactory, WorkerFactory noIsolationWorkerFactory,
-        JavaForkOptionsFactory forkOptionsFactory, WorkerLeaseRegistry workerLeaseRegistry, BuildOperationExecutor buildOperationExecutor,
+        JavaForkOptionsFactory forkOptionsFactory, WorkerThreadRegistry workerThreadRegistry, BuildOperationExecutor buildOperationExecutor,
         AsyncWorkTracker asyncWorkTracker, WorkerDirectoryProvider workerDirectoryProvider, WorkerExecutionQueueFactory workerExecutionQueueFactory,
         ClassLoaderStructureProvider classLoaderStructureProvider, ActionExecutionSpecFactory actionExecutionSpecFactory, Instantiator instantiator, File baseDir
     ) {
@@ -84,7 +81,7 @@ public class DefaultWorkerExecutor implements WorkerExecutor {
         this.noIsolationWorkerFactory = noIsolationWorkerFactory;
         this.forkOptionsFactory = forkOptionsFactory;
         this.executionQueue = workerExecutionQueueFactory.create();
-        this.workerLeaseRegistry = workerLeaseRegistry;
+        this.workerThreadRegistry = workerThreadRegistry;
         this.buildOperationExecutor = buildOperationExecutor;
         this.asyncWorkTracker = asyncWorkTracker;
         this.workerDirectoryProvider = workerDirectoryProvider;
@@ -202,7 +199,7 @@ public class DefaultWorkerExecutor implements WorkerExecutor {
     private AsyncWorkCompletion submitWork(IsolatedParametersActionExecutionSpec<?> spec, WorkerFactory workerFactory, WorkerRequirement workerRequirement) {
         checkIsManagedThread();
         final BuildOperationRef currentBuildOperation = buildOperationExecutor.getCurrentOperation();
-        WorkItemExecution execution = new WorkItemExecution(spec.getDisplayName(), workerLeaseRegistry, () -> {
+        WorkItemExecution execution = new WorkItemExecution(spec.getDisplayName(), () -> {
             try {
                 BuildOperationAwareWorker worker = workerFactory.getWorker(workerRequirement);
                 return worker.execute(spec, currentBuildOperation);
@@ -228,11 +225,9 @@ public class DefaultWorkerExecutor implements WorkerExecutor {
         }
     }
 
-    private WorkerLease checkIsManagedThread() {
-        try {
-            return workerLeaseRegistry.getCurrentWorkerLease();
-        } catch (NoAvailableWorkerLeaseException e) {
-            throw new IllegalStateException("An attempt was made to submit work from a thread not managed by Gradle.  Work may only be submitted from a Gradle-managed thread.", e);
+    private void checkIsManagedThread() {
+        if (!workerThreadRegistry.isWorkerThread()) {
+            throw new IllegalStateException("An attempt was made to submit work from a thread not managed by Gradle.  Work may only be submitted from a Gradle-managed thread.");
         }
     }
 
@@ -331,23 +326,10 @@ public class DefaultWorkerExecutor implements WorkerExecutor {
 
     private static class WorkItemExecution extends AbstractConditionalExecution<DefaultWorkResult> implements AsyncWorkCompletion {
         private final String description;
-        private final WorkerLeaseRegistry workerLeaseRegistry;
-        private WorkerLease lease;
 
-        public WorkItemExecution(String description, WorkerLeaseRegistry workerLeaseRegistry, Callable<DefaultWorkResult> callable) {
+        public WorkItemExecution(String description, Callable<DefaultWorkResult> callable) {
             super(callable);
             this.description = description;
-            this.workerLeaseRegistry = workerLeaseRegistry;
-        }
-
-        @Override
-        public ResourceLock getResourceLock() {
-            synchronized (this) {
-                if (lease == null) {
-                    lease = workerLeaseRegistry.getWorkerLease();
-                }
-                return lease;
-            }
         }
 
         @Override
