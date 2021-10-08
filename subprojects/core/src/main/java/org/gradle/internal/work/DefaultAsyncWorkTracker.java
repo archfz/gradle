@@ -124,7 +124,7 @@ public class DefaultAsyncWorkTracker implements AsyncWorkTracker {
 
     private void waitForItemsAndGatherFailures(Iterable<AsyncWorkCompletion> workItems) {
         // Release worker lease while waiting
-        workerLeaseService.withoutLocks(Collections.singleton(workerLeaseService.getCurrentWorkerLease()), () -> {
+        workerLeaseService.withoutLocks(Collections.singletonList(workerLeaseService.getCurrentWorkerLease()), () -> {
             final List<Throwable> failures = Lists.newArrayList();
             for (AsyncWorkCompletion item : workItems) {
                 try {
