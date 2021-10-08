@@ -166,10 +166,14 @@ class StateTransitionControllerTest extends ConcurrentSpec {
     def "runs action when not in forbidden state"() {
         def action = Mock(Supplier)
         def controller = controller(TestState.A)
-        controller.transition(TestState.A, TestState.B) {}
+        asWorker {
+            controller.transition(TestState.A, TestState.B) {}
+        }
 
         when:
-        controller.notInStateIgnoreOtherThreads(TestState.A, action)
+        asWorker {
+            controller.notInStateIgnoreOtherThreads(TestState.A, action)
+        }
 
         then:
         1 * action.get() >> "result"
@@ -179,14 +183,18 @@ class StateTransitionControllerTest extends ConcurrentSpec {
     def "fails when in forbidden state"() {
         def action = Mock(Supplier)
         def controller = controller(TestState.A)
-        controller.transition(TestState.A, TestState.B) {}
+        asWorker {
+            controller.transition(TestState.A, TestState.B) {}
+        }
 
         when:
-        controller.notInStateIgnoreOtherThreads(TestState.B, action)
+        asWorker {
+            controller.notInStateIgnoreOtherThreads(TestState.B, action)
+        }
 
         then:
         def e = thrown(IllegalStateException)
-        e.message == "Should not be in state B."
+        e.message == "<state> should not be in state B."
 
         0 * _
     }
@@ -195,10 +203,14 @@ class StateTransitionControllerTest extends ConcurrentSpec {
         def failure = new RuntimeException()
         def action = Mock(Supplier)
         def controller = controller(TestState.A)
-        controller.transition(TestState.A, TestState.B) {}
+        asWorker {
+            controller.transition(TestState.A, TestState.B) {}
+        }
 
         when:
-        controller.notInStateIgnoreOtherThreads(TestState.A, action)
+        asWorker {
+            controller.notInStateIgnoreOtherThreads(TestState.A, action)
+        }
 
         then:
         def e = thrown(RuntimeException)
@@ -209,7 +221,9 @@ class StateTransitionControllerTest extends ConcurrentSpec {
         0 * _
 
         when:
-        controller.notInStateIgnoreOtherThreads(TestState.B, action)
+        asWorker {
+            controller.notInStateIgnoreOtherThreads(TestState.B, action)
+        }
 
         then:
         def e2 = thrown(RuntimeException)
@@ -222,10 +236,14 @@ class StateTransitionControllerTest extends ConcurrentSpec {
     def "produces value when in expected state"() {
         def action = Mock(Supplier)
         def controller = controller(TestState.A)
-        controller.transition(TestState.A, TestState.B) {}
+        asWorker {
+            controller.transition(TestState.A, TestState.B) {}
+        }
 
         when:
-        def result = controller.inState(TestState.B, action)
+        def result = asWorker {
+            controller.inState(TestState.B, action)
+        }
 
         then:
         result == "result"
@@ -236,10 +254,14 @@ class StateTransitionControllerTest extends ConcurrentSpec {
     def "runs action when in expected state"() {
         def action = Mock(Runnable)
         def controller = controller(TestState.A)
-        controller.transition(TestState.A, TestState.B) {}
+        asWorker {
+            controller.transition(TestState.A, TestState.B) {}
+        }
 
         when:
-        controller.inState(TestState.B, action)
+        asWorker {
+            controller.inState(TestState.B, action)
+        }
 
         then:
         1 * action.run()
@@ -249,14 +271,18 @@ class StateTransitionControllerTest extends ConcurrentSpec {
     def "fails when not in expected state"() {
         def action = Mock(Runnable)
         def controller = controller(TestState.A)
-        controller.transition(TestState.A, TestState.B) {}
+        asWorker {
+            controller.transition(TestState.A, TestState.B) {}
+        }
 
         when:
-        controller.inState(TestState.C, action)
+        asWorker {
+            controller.inState(TestState.C, action)
+        }
 
         then:
         def e = thrown(IllegalStateException)
-        e.message == "Expected to be in state C but is in state B."
+        e.message == "Expected <state> to be in state C but is in state B."
 
         0 * _
     }
@@ -265,10 +291,14 @@ class StateTransitionControllerTest extends ConcurrentSpec {
         def failure = new RuntimeException()
         def action = Mock(Runnable)
         def controller = controller(TestState.A)
-        controller.transition(TestState.A, TestState.B) {}
+        asWorker {
+            controller.transition(TestState.A, TestState.B) {}
+        }
 
         when:
-        controller.inState(TestState.B, action)
+        asWorker {
+            controller.inState(TestState.B, action)
+        }
 
         then:
         def e = thrown(RuntimeException)
@@ -279,11 +309,13 @@ class StateTransitionControllerTest extends ConcurrentSpec {
         0 * _
 
         when:
-        controller.inState(TestState.B, action)
+        asWorker {
+            controller.inState(TestState.B, action)
+        }
 
         then:
         def e2 = thrown(IllegalStateException)
-        e2.message == "Cannot use this object as a previous transition failed."
+        e2.message == "Cannot use <state> as a previous transition failed."
 
         and:
         0 * _
@@ -295,14 +327,18 @@ class StateTransitionControllerTest extends ConcurrentSpec {
         when:
         async {
             start {
-                controller.transition(TestState.A, TestState.B) {
-                    instant.transitioning
-                    thread.block()
+                asWorker {
+                    controller.transition(TestState.A, TestState.B) {
+                        instant.transitioning
+                        thread.block()
+                    }
                 }
             }
             start {
                 thread.blockUntil.transitioning
-                controller.inState(TestState.A) {
+                asWorker {
+                    controller.inState(TestState.A) {
+                    }
                 }
             }
 
@@ -318,7 +354,9 @@ class StateTransitionControllerTest extends ConcurrentSpec {
         def controller = controller(TestState.A)
 
         when:
-        controller.transitionIfNotPreviously(TestState.A, TestState.B, action)
+        asWorker {
+            controller.transitionIfNotPreviously(TestState.A, TestState.B, action)
+        }
 
         then:
         1 * action.run()
@@ -328,10 +366,14 @@ class StateTransitionControllerTest extends ConcurrentSpec {
     def "does not run action for conditional transition when already in to state"() {
         def action = Mock(Runnable)
         def controller = controller(TestState.A)
-        controller.transitionIfNotPreviously(TestState.A, TestState.B) {}
+        asWorker {
+            controller.transitionIfNotPreviously(TestState.A, TestState.B) {}
+        }
 
         when:
-        controller.transitionIfNotPreviously(TestState.A, TestState.B, action)
+        asWorker {
+            controller.transitionIfNotPreviously(TestState.A, TestState.B, action)
+        }
 
         then:
         0 * _
@@ -340,11 +382,15 @@ class StateTransitionControllerTest extends ConcurrentSpec {
     def "does not run action for conditional transition when has already transitioned from to state"() {
         def action = Mock(Runnable)
         def controller = controller(TestState.A)
-        controller.transitionIfNotPreviously(TestState.A, TestState.B) {}
-        controller.transitionIfNotPreviously(TestState.B, TestState.C) {}
+        asWorker {
+            controller.transitionIfNotPreviously(TestState.A, TestState.B) {}
+            controller.transitionIfNotPreviously(TestState.B, TestState.C) {}
+        }
 
         when:
-        controller.transitionIfNotPreviously(TestState.A, TestState.B, action)
+        asWorker {
+            controller.transitionIfNotPreviously(TestState.A, TestState.B, action)
+        }
 
         then:
         0 * _
@@ -356,14 +402,18 @@ class StateTransitionControllerTest extends ConcurrentSpec {
         def controller = controller(TestState.A)
 
         when:
-        controller.transitionIfNotPreviously(TestState.A, TestState.B) { throw failure }
+        asWorker {
+            controller.transitionIfNotPreviously(TestState.A, TestState.B) { throw failure }
+        }
 
         then:
         def e = thrown(RuntimeException)
         e == failure
 
         when:
-        controller.transitionIfNotPreviously(TestState.B, TestState.C, action)
+        asWorker {
+            controller.transitionIfNotPreviously(TestState.B, TestState.C, action)
+        }
 
         then:
         def e2 = thrown(IllegalStateException)
@@ -378,7 +428,9 @@ class StateTransitionControllerTest extends ConcurrentSpec {
         def controller = controller(TestState.A)
 
         when:
-        controller.transitionIfNotPreviously(TestState.B, TestState.C, action)
+        asWorker {
+            controller.transitionIfNotPreviously(TestState.B, TestState.C, action)
+        }
 
         then:
         def e = thrown(IllegalStateException)
@@ -390,7 +442,9 @@ class StateTransitionControllerTest extends ConcurrentSpec {
         def controller = controller(TestState.A)
 
         when:
-        controller.transitionIfNotPreviously(TestState.A, TestState.B, action)
+        asWorker {
+            controller.transitionIfNotPreviously(TestState.A, TestState.B, action)
+        }
 
         then:
         def e = thrown(IllegalStateException)
@@ -408,14 +462,18 @@ class StateTransitionControllerTest extends ConcurrentSpec {
         when:
         async {
             start {
-                controller.transitionIfNotPreviously(TestState.A, TestState.B) {
-                    instant.transitioning
-                    thread.block()
+                asWorker {
+                    controller.transitionIfNotPreviously(TestState.A, TestState.B) {
+                        instant.transitioning
+                        thread.block()
+                    }
                 }
             }
             start {
                 thread.blockUntil.transitioning
-                controller.transitionIfNotPreviously(TestState.A, TestState.B) {
+                asWorker {
+                    controller.transitionIfNotPreviously(TestState.A, TestState.B) {
+                    }
                 }
             }
 
