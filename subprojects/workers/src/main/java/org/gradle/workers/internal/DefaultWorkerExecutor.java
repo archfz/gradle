@@ -73,10 +73,12 @@ public class DefaultWorkerExecutor implements WorkerExecutor {
     private final IsolationScheme<WorkAction<?>, WorkParameters> isolationScheme = new IsolationScheme<>(Cast.uncheckedCast(WorkAction.class), WorkParameters.class, WorkParameters.None.class);
     private final File baseDir;
 
-    public DefaultWorkerExecutor(WorkerFactory daemonWorkerFactory, WorkerFactory isolatedClassloaderWorkerFactory, WorkerFactory noIsolationWorkerFactory,
-                                 JavaForkOptionsFactory forkOptionsFactory, WorkerLeaseRegistry workerLeaseRegistry, BuildOperationExecutor buildOperationExecutor,
-                                 AsyncWorkTracker asyncWorkTracker, WorkerDirectoryProvider workerDirectoryProvider, WorkerExecutionQueueFactory workerExecutionQueueFactory,
-                                 ClassLoaderStructureProvider classLoaderStructureProvider, ActionExecutionSpecFactory actionExecutionSpecFactory, Instantiator instantiator, File baseDir) {
+    public DefaultWorkerExecutor(
+        WorkerFactory daemonWorkerFactory, WorkerFactory isolatedClassloaderWorkerFactory, WorkerFactory noIsolationWorkerFactory,
+        JavaForkOptionsFactory forkOptionsFactory, WorkerLeaseRegistry workerLeaseRegistry, BuildOperationExecutor buildOperationExecutor,
+        AsyncWorkTracker asyncWorkTracker, WorkerDirectoryProvider workerDirectoryProvider, WorkerExecutionQueueFactory workerExecutionQueueFactory,
+        ClassLoaderStructureProvider classLoaderStructureProvider, ActionExecutionSpecFactory actionExecutionSpecFactory, Instantiator instantiator, File baseDir
+    ) {
         this.daemonWorkerFactory = daemonWorkerFactory;
         this.isolatedClassloaderWorkerFactory = isolatedClassloaderWorkerFactory;
         this.noIsolationWorkerFactory = noIsolationWorkerFactory;
@@ -198,9 +200,9 @@ public class DefaultWorkerExecutor implements WorkerExecutor {
     }
 
     private AsyncWorkCompletion submitWork(IsolatedParametersActionExecutionSpec<?> spec, WorkerFactory workerFactory, WorkerRequirement workerRequirement) {
-        final WorkerLease currentWorkerWorkerLease = getCurrentWorkerLease();
+        checkIsManagedThread();
         final BuildOperationRef currentBuildOperation = buildOperationExecutor.getCurrentOperation();
-        WorkItemExecution execution = new WorkItemExecution(spec.getDisplayName(), currentWorkerWorkerLease, () -> {
+        WorkItemExecution execution = new WorkItemExecution(spec.getDisplayName(), workerLeaseRegistry, () -> {
             try {
                 BuildOperationAwareWorker worker = workerFactory.getWorker(workerRequirement);
                 return worker.execute(spec, currentBuildOperation);
@@ -226,7 +228,7 @@ public class DefaultWorkerExecutor implements WorkerExecutor {
         }
     }
 
-    private WorkerLease getCurrentWorkerLease() {
+    private WorkerLease checkIsManagedThread() {
         try {
             return workerLeaseRegistry.getCurrentWorkerLease();
         } catch (NoAvailableWorkerLeaseException e) {
@@ -237,7 +239,7 @@ public class DefaultWorkerExecutor implements WorkerExecutor {
     /**
      * Wait for any outstanding work to complete.  Note that if there is uncompleted work associated
      * with the current build operation, we'll also temporarily expand the thread pool of the execution queue.
-     * This is to avoid a thread starvation scenario (see {@link DefaultConditionalExecutionQueue#expand(boolean)}
+     * This is to avoid a thread starvation scenario (see {@link DefaultConditionalExecutionQueue#expand()}
      * for further details).
      */
     @Override
@@ -329,10 +331,23 @@ public class DefaultWorkerExecutor implements WorkerExecutor {
 
     private static class WorkItemExecution extends AbstractConditionalExecution<DefaultWorkResult> implements AsyncWorkCompletion {
         private final String description;
+        private final WorkerLeaseRegistry workerLeaseRegistry;
+        private WorkerLease lease;
 
-        public WorkItemExecution(String description, WorkerLease parentWorkerLease, Callable<DefaultWorkResult> callable) {
-            super(callable, new LazyChildWorkerLeaseLock(parentWorkerLease));
+        public WorkItemExecution(String description, WorkerLeaseRegistry workerLeaseRegistry, Callable<DefaultWorkResult> callable) {
+            super(callable);
             this.description = description;
+            this.workerLeaseRegistry = workerLeaseRegistry;
+        }
+
+        @Override
+        public ResourceLock getResourceLock() {
+            synchronized (this) {
+                if (lease == null) {
+                    lease = workerLeaseRegistry.getWorkerLease();
+                }
+                return lease;
+            }
         }
 
         @Override
@@ -341,53 +356,6 @@ public class DefaultWorkerExecutor implements WorkerExecutor {
             if (!result.isSuccess()) {
                 throw new WorkExecutionException(description, result.getException());
             }
-        }
-    }
-
-    private static class LazyChildWorkerLeaseLock implements ResourceLock {
-        private final WorkerLease parentWorkerLease;
-        private WorkerLease child;
-
-        public LazyChildWorkerLeaseLock(WorkerLease parentWorkerLease) {
-            this.parentWorkerLease = parentWorkerLease;
-        }
-
-        @Override
-        public boolean isLocked() {
-            return getChild().isLocked();
-        }
-
-        @Override
-        public boolean isLockedByCurrentThread() {
-            return getChild().isLockedByCurrentThread();
-        }
-
-        @Override
-        public boolean tryLock() {
-            child = parentWorkerLease.createChild();
-            if (child.tryLock()) {
-                return true;
-            } else {
-                child = null;
-                return false;
-            }
-        }
-
-        @Override
-        public void unlock() {
-            getChild().unlock();
-        }
-
-        @Override
-        public String getDisplayName() {
-            return getChild().getDisplayName();
-        }
-
-        private WorkerLease getChild() {
-            if (child == null) {
-                throw new IllegalStateException("Detected attempt to access LazyChildWorkerLeaseLock before tryLock() has succeeded.  tryLock must be succeed before other methods are called.");
-            }
-            return child;
         }
     }
 

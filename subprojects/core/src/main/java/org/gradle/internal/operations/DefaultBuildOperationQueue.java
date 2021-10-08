@@ -17,7 +17,6 @@
 package org.gradle.internal.operations;
 
 import org.gradle.internal.UncheckedException;
-import org.gradle.internal.work.WorkerLeaseRegistry;
 import org.gradle.internal.work.WorkerLeaseService;
 
 import javax.annotation.Nullable;
@@ -34,7 +33,6 @@ class DefaultBuildOperationQueue<T extends BuildOperation> implements BuildOpera
 
     private final boolean allowAccessToProjectState;
     private final WorkerLeaseService workerLeases;
-    private final WorkerLeaseRegistry.WorkerLease parentWorkerLease;
     private final Executor executor;
     private final QueueWorker<T> queueWorker;
     private String logLocation;
@@ -52,7 +50,6 @@ class DefaultBuildOperationQueue<T extends BuildOperation> implements BuildOpera
     DefaultBuildOperationQueue(boolean allowAccessToProjectState, WorkerLeaseService workerLeases, Executor executor, QueueWorker<T> queueWorker) {
         this.allowAccessToProjectState = allowAccessToProjectState;
         this.workerLeases = workerLeases;
-        this.parentWorkerLease = workerLeases.getCurrentWorkerLease();
         this.executor = executor;
         this.queueWorker = queueWorker;
     }
@@ -196,7 +193,7 @@ class DefaultBuildOperationQueue<T extends BuildOperation> implements BuildOpera
             // the parent lease is released.
             completeOperations(
                 // Run while holding worker lease.
-                workerLeases.runAsWorkerThread(parentWorkerLease.createChild(), () -> {
+                workerLeases.runAsWorkerThread(() -> {
                     if (allowAccessToProjectState) {
                         return doRunBatch(firstOperation);
                     } else {

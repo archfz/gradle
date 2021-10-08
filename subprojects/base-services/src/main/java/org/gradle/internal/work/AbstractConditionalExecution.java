@@ -25,19 +25,12 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.RunnableFuture;
 
-public class AbstractConditionalExecution<T> implements ConditionalExecution<T> {
+public abstract class AbstractConditionalExecution<T> implements ConditionalExecution<T> {
     private final CountDownLatch finished = new CountDownLatch(1);
     private final RunnableFuture<T> runnable;
-    private final ResourceLock resourceLock;
 
-    public AbstractConditionalExecution(final Callable<T> callable, ResourceLock resourceLock) {
+    public AbstractConditionalExecution(final Callable<T> callable) {
         this.runnable = new FutureTask<T>(callable);
-        this.resourceLock = resourceLock;
-    }
-
-    @Override
-    public ResourceLock getResourceLock() {
-        return resourceLock;
     }
 
     @Override

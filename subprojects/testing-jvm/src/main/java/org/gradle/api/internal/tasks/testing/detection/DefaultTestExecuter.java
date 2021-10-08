@@ -62,9 +62,11 @@ public class DefaultTestExecuter implements TestExecuter<JvmTestExecutionSpec> {
     private final DefaultTestFilter testFilter;
     private TestClassProcessor processor;
 
-    public DefaultTestExecuter(WorkerProcessFactory workerFactory, ActorFactory actorFactory, ModuleRegistry moduleRegistry,
-                               WorkerLeaseRegistry workerLeaseRegistry, int maxWorkerCount,
-                               Clock clock, DocumentationRegistry documentationRegistry, DefaultTestFilter testFilter) {
+    public DefaultTestExecuter(
+        WorkerProcessFactory workerFactory, ActorFactory actorFactory, ModuleRegistry moduleRegistry,
+        WorkerLeaseRegistry workerLeaseRegistry, int maxWorkerCount,
+        Clock clock, DocumentationRegistry documentationRegistry, DefaultTestFilter testFilter
+    ) {
         this.workerFactory = workerFactory;
         this.actorFactory = actorFactory;
         this.moduleRegistry = moduleRegistry;
@@ -79,14 +81,13 @@ public class DefaultTestExecuter implements TestExecuter<JvmTestExecutionSpec> {
     public void execute(final JvmTestExecutionSpec testExecutionSpec, TestResultProcessor testResultProcessor) {
         final TestFramework testFramework = testExecutionSpec.getTestFramework();
         final WorkerTestClassProcessorFactory testInstanceFactory = testFramework.getProcessorFactory();
-        final WorkerLeaseRegistry.WorkerLease currentWorkerLease = workerLeaseRegistry.getCurrentWorkerLease();
         final Set<File> classpath = ImmutableSet.copyOf(testExecutionSpec.getClasspath());
         final Set<File> modulePath = ImmutableSet.copyOf(testExecutionSpec.getModulePath());
         final List<String> testWorkerImplementationModules = testFramework.getTestWorkerImplementationModules();
         final Factory<TestClassProcessor> forkingProcessorFactory = new Factory<TestClassProcessor>() {
             @Override
             public TestClassProcessor create() {
-                return new ForkingTestClassProcessor(currentWorkerLease, workerFactory, testInstanceFactory, testExecutionSpec.getJavaForkOptions(),
+                return new ForkingTestClassProcessor(workerLeaseRegistry, workerFactory, testInstanceFactory, testExecutionSpec.getJavaForkOptions(),
                     classpath, modulePath, testWorkerImplementationModules, testFramework.getWorkerConfigurationAction(), moduleRegistry, documentationRegistry);
             }
         };
