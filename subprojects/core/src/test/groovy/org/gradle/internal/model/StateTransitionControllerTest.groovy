@@ -417,7 +417,7 @@ class StateTransitionControllerTest extends ConcurrentSpec {
 
         then:
         def e2 = thrown(IllegalStateException)
-        e2.message == "Cannot use this object as a previous transition failed."
+        e2.message == "Cannot use <state> as a previous transition failed."
 
         and:
         0 * _
@@ -434,7 +434,7 @@ class StateTransitionControllerTest extends ConcurrentSpec {
 
         then:
         def e = thrown(IllegalStateException)
-        e.message == "Can only transition to state C from state B however currently in state A."
+        e.message == "Can only transition <state> to state C from state B however it is currently in state A."
     }
 
     def "action cannot attempt to do conditional transition while already transitioning"() {
@@ -448,7 +448,7 @@ class StateTransitionControllerTest extends ConcurrentSpec {
 
         then:
         def e = thrown(IllegalStateException)
-        e.message == "Cannot transition to state B as already transitioning to this state."
+        e.message == "Cannot transition <state> to state B as already transitioning to this state."
 
         1 * action.run() >> {
             controller.transitionIfNotPreviously(TestState.A, TestState.B, {})
@@ -481,6 +481,6 @@ class StateTransitionControllerTest extends ConcurrentSpec {
 
         then:
         def e = thrown(IllegalStateException)
-        e.message == "Another thread is currently transitioning state from A to B."
+        e.message == "Another thread is currently transitioning <state> state from A to B."
     }
 }
