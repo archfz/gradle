@@ -30,7 +30,7 @@ class TestWorkerLeaseService implements WorkerLeaseService {
     }
 
     @Override
-    WorkerLeaseCompletion start() {
+    WorkerLeaseCompletion startWorker() {
         throw new UnsupportedOperationException()
     }
 

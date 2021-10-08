@@ -88,7 +88,7 @@ public class ForkingTestClassProcessor implements TestClassProcessor {
             }
 
             if (remoteProcessor == null) {
-                completion = workerLeaseRegistry.start();
+                completion = workerLeaseRegistry.startWorker();
                 try {
                     remoteProcessor = forkProcess();
                 } catch (RuntimeException e) {

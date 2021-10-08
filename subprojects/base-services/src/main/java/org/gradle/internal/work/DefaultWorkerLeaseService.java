@@ -325,7 +325,7 @@ public class DefaultWorkerLeaseService implements WorkerLeaseService, Stoppable 
     }
 
     @Override
-    public WorkerLeaseCompletion start() {
+    public WorkerLeaseCompletion startWorker() {
         DefaultWorkerLease lease = getWorkerLease();
         coordinationService.withStateLock(lock(lease));
         return lease;
