@@ -152,10 +152,7 @@ public class DefaultProjectStateRegistry implements ProjectStateRegistry {
             // Holds the lock so run the action
             return factory.create();
         }
-        if (!locks.isEmpty()) {
-            throw new IllegalStateException("This thread already holds a lock for a project. Cannot upgrade to all projects lock.");
-        }
-        return workerLeaseService.withLocks(Collections.singletonList(allProjectsLock), factory);
+        return workerLeaseService.withLocks(Collections.singletonList(allProjectsLock), () -> workerLeaseService.withoutLocks(locks, factory));
     }
 
     @Override

@@ -26,6 +26,7 @@ public class ProjectLock extends ExclusiveAccessResourceLock {
 
     @Override
     protected boolean canAcquire() {
-        return !allProjectsLock.isLocked();
+        // Either the "all projects" lock is not held, or it is held by this thread
+        return !allProjectsLock.isLocked() || allProjectsLock.isLockedByCurrentThread();
     }
 }

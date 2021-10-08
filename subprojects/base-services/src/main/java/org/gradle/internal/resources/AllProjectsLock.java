@@ -26,6 +26,7 @@ public class AllProjectsLock extends ExclusiveAccessResourceLock {
 
     @Override
     protected boolean canAcquire() {
-        return owner.getLockedProjects() == 0;
+        // Either there are no project locks, or this thread owns all of the project locks
+        return owner.getLockedProjects() == 0 || owner.getResourceLocksByCurrentThread().size() == owner.getLockedProjects();
     }
 }
