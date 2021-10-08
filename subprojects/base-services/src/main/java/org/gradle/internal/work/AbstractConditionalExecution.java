@@ -17,7 +17,6 @@
 package org.gradle.internal.work;
 
 import org.gradle.internal.UncheckedException;
-import org.gradle.internal.resources.ResourceLock;
 
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
