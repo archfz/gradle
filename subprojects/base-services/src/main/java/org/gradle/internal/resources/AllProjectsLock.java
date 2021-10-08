@@ -17,16 +17,13 @@
 package org.gradle.internal.resources;
 
 public class AllProjectsLock extends ExclusiveAccessResourceLock {
-    private final ProjectLockRegistry owner;
-
     public AllProjectsLock(String displayName, ResourceLockCoordinationService coordinationService, ProjectLockRegistry owner) {
         super(displayName, coordinationService, owner);
-        this.owner = owner;
     }
 
     @Override
     protected boolean canAcquire() {
-        // Either there are no project locks, or this thread owns all of the project locks
-        return owner.getLockedProjects() == 0 || owner.getResourceLocksByCurrentThread().size() == owner.getLockedProjects();
+        // TODO - should block while some other thread holds a project lock
+        return true;
     }
 }
