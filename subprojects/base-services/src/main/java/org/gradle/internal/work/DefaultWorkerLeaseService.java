@@ -193,6 +193,12 @@ public class DefaultWorkerLeaseService implements WorkerLeaseService, Stoppable 
         runAsIsolatedTask(Factories.toFactory(runnable));
     }
 
+    @Deprecated
+    @Override
+    public void withoutProjectLock(Runnable action) {
+        runAsIsolatedTask(action);
+    }
+
     @Override
     public <T> T runAsIsolatedTask(Factory<T> factory) {
         Collection<? extends ResourceLock> projectLocks = getCurrentProjectLocks();
