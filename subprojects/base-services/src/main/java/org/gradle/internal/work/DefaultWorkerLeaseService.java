@@ -332,13 +332,13 @@ public class DefaultWorkerLeaseService implements WorkerLeaseService, Stoppable 
     }
 
     private void releaseWorkerLeaseAndWaitFor(Iterable<? extends ResourceLock> locks) {
-        WorkerLease workerLease = getCurrentWorkerLease();
+        Collection<? extends ResourceLock> workerLeases = workerLeaseLockRegistry.getResourceLocksByCurrentThread();
         List<ResourceLock> allLocks = Lists.newArrayList();
-        allLocks.add(workerLease);
+        allLocks.addAll(workerLeases);
         Iterables.addAll(allLocks, locks);
         // We free the worker lease but keep shared resource leases. We don't want to free shared resources until a task completes,
         // regardless of whether it is actually doing work just to make behavior more predictable. This might change in the future.
-        coordinationService.withStateLock(unlock(workerLease));
+        coordinationService.withStateLock(unlock(workerLeases));
         acquireLocks(allLocks);
     }
 

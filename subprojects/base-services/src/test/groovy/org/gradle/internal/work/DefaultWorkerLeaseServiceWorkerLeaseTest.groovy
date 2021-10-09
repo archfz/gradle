@@ -245,6 +245,37 @@ class DefaultWorkerLeaseServiceWorkerLeaseTest extends ConcurrentSpec {
         registry?.stop()
     }
 
+    def "can release and reacquire worker lease"() {
+        def registry = workerLeaseService(1)
+
+        when:
+        async {
+            start {
+                registry.runAsWorkerThread {
+                    instant.worker1
+                    registry.withoutLocks([registry.currentWorkerLease]) {
+                        thread.blockUntil.worker2
+                    }
+                    instant.acquired
+                }
+            }
+            start {
+                thread.blockUntil.worker1
+                registry.runAsWorkerThread {
+                    instant.worker2
+                    thread.block()
+                    instant.worker2Finished
+                }
+            }
+        }
+
+        then:
+        instant.acquired > instant.worker2Finished
+
+        cleanup:
+        registry?.stop()
+    }
+
     WorkerLeaseService workerLeaseService(int maxWorkers) {
         return new DefaultWorkerLeaseService(coordinationService, new DefaultParallelismConfiguration(true, maxWorkers))
     }
