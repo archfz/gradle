@@ -36,6 +36,7 @@ import org.gradle.internal.resources.ResourceLock;
 import org.gradle.internal.resources.ResourceLockContainer;
 import org.gradle.internal.resources.ResourceLockCoordinationService;
 import org.gradle.internal.resources.ResourceLockState;
+import org.gradle.internal.resources.TaskExecutionLockRegistry;
 import org.gradle.internal.time.Time;
 import org.gradle.internal.time.Timer;
 import org.gradle.util.Path;
@@ -64,6 +65,7 @@ public class DefaultWorkerLeaseService implements WorkerLeaseService, Stoppable 
     private final Root root = new Root();
 
     private final ResourceLockCoordinationService coordinationService;
+    private final TaskExecutionLockRegistry taskLockRegistry;
     private final ProjectLockRegistry projectLockRegistry;
     private final WorkerLeaseLockRegistry workerLeaseLockRegistry;
     private final ProjectLockStatisticsImpl projectLockStatistics = new ProjectLockStatisticsImpl();
@@ -72,6 +74,7 @@ public class DefaultWorkerLeaseService implements WorkerLeaseService, Stoppable 
         this.maxWorkerCount = parallelismConfiguration.getMaxWorkerCount();
         this.coordinationService = coordinationService;
         this.projectLockRegistry = new ProjectLockRegistry(coordinationService, parallelismConfiguration.isParallelProjectExecutionEnabled());
+        this.taskLockRegistry = new TaskExecutionLockRegistry(coordinationService, projectLockRegistry);
         this.workerLeaseLockRegistry = new WorkerLeaseLockRegistry(coordinationService);
         LOGGER.info("Using {} worker leases.", maxWorkerCount);
     }
@@ -137,6 +140,9 @@ public class DefaultWorkerLeaseService implements WorkerLeaseService, Stoppable 
                 if (projectLockRegistry.hasOpenLocks()) {
                     throw new IllegalStateException("Some project locks have not been unlocked.");
                 }
+                if (taskLockRegistry.hasOpenLocks()) {
+                    throw new IllegalStateException("Some task execution locks have not been unlocked.");
+                }
                 return FINISHED;
             }
         });
@@ -162,6 +168,11 @@ public class DefaultWorkerLeaseService implements WorkerLeaseService, Stoppable 
     }
 
     @Override
+    public ResourceLock getTaskExecutionLock(Path buildIdentityPath, Path projectIdentityPath) {
+        return taskLockRegistry.getTaskExecutionLock(buildIdentityPath, projectIdentityPath);
+    }
+
+    @Override
     public Collection<? extends ResourceLock> getCurrentProjectLocks() {
         return projectLockRegistry.getResourceLocksByCurrentThread();
     }
@@ -170,6 +181,7 @@ public class DefaultWorkerLeaseService implements WorkerLeaseService, Stoppable 
     public void releaseCurrentProjectLocks() {
         Collection<? extends ResourceLock> projectLocks = getCurrentProjectLocks();
         releaseLocks(projectLocks);
+        releaseLocks(taskLockRegistry.getResourceLocksByCurrentThread());
     }
 
     public void releaseCurrentResourceLocks() {

@@ -30,6 +30,11 @@ class TestWorkerLeaseService implements WorkerLeaseService {
     }
 
     @Override
+    ResourceLock getTaskExecutionLock(Path buildIdentityPath, Path projectIdentityPath) {
+        return null
+    }
+
+    @Override
     WorkerLeaseCompletion startWorker() {
         throw new UnsupportedOperationException()
     }
