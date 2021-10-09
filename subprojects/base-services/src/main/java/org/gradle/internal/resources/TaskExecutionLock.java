@@ -26,12 +26,12 @@ public class TaskExecutionLock extends ExclusiveAccessResourceLock {
 
     @Override
     protected boolean canAcquire() {
-        return stateLock.tryLock();
+        return stateLock.isLockedByCurrentThread() || stateLock.tryLock();
     }
 
     @Override
     protected void releaseLock() {
         super.releaseLock();
-        stateLock.releaseLock();
+        stateLock.unlock();
     }
 }
