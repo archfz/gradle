@@ -50,7 +50,7 @@ class TestWorkerLeaseService implements WorkerLeaseService {
     }
 
     @Override
-    void releaseCurrentProjectLocks() {
+    void runAsIsolatedTask() {
     }
 
     @Override
@@ -99,12 +99,12 @@ class TestWorkerLeaseService implements WorkerLeaseService {
     }
 
     @Override
-    void withoutProjectLock(Runnable runnable) {
+    void runAsIsolatedTask(Runnable runnable) {
         runnable.run()
     }
 
     @Override
-    def <T> T withoutProjectLock(Factory<T> action) {
+    def <T> T runAsIsolatedTask(Factory<T> action) {
         return action.call()
     }
 

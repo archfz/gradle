@@ -288,7 +288,7 @@ class DefaultWorkerLeaseServiceProjectLockTest extends ConcurrentSpec {
         when:
         workerLeaseService.withLocks([projectLock]) {
             assert lockIsHeld(projectLock)
-            workerLeaseService.withoutProjectLock() {
+            workerLeaseService.runAsIsolatedTask() {
                 assert !lockIsHeld(projectLock)
                 executed = true
             }
@@ -312,7 +312,7 @@ class DefaultWorkerLeaseServiceProjectLockTest extends ConcurrentSpec {
         workerLeaseService.withLocks([projectLock, otherProjectLock]) {
             assert lockIsHeld(projectLock)
             assert lockIsHeld(otherProjectLock)
-            workerLeaseService.withoutProjectLock {
+            workerLeaseService.runAsIsolatedTask {
                 assert !lockIsHeld(projectLock)
                 assert !lockIsHeld(otherProjectLock)
                 executed = true
@@ -331,7 +331,7 @@ class DefaultWorkerLeaseServiceProjectLockTest extends ConcurrentSpec {
         boolean executed = false
 
         when:
-        workerLeaseService.withoutProjectLock {
+        workerLeaseService.runAsIsolatedTask {
             executed = true
         }
 
@@ -347,7 +347,7 @@ class DefaultWorkerLeaseServiceProjectLockTest extends ConcurrentSpec {
             start {
                 def workerLease = workerLeaseService.getWorkerLease()
                 workerLeaseService.withLocks([projectLock, workerLease]) {
-                    workerLeaseService.withoutProjectLock {
+                    workerLeaseService.runAsIsolatedTask {
                         thread.blockUntil.projectLocked
                     }
                     instant.worker1Executed
@@ -431,7 +431,7 @@ class DefaultWorkerLeaseServiceProjectLockTest extends ConcurrentSpec {
         when:
         workerLeaseService.withLocks([projectLock]) {
             workerLeaseService.whileDisallowingProjectLockChanges {
-                workerLeaseService.withoutProjectLock {}
+                workerLeaseService.runAsIsolatedTask {}
             }
         }
 

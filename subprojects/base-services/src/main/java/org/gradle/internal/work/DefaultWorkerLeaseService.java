@@ -178,7 +178,7 @@ public class DefaultWorkerLeaseService implements WorkerLeaseService, Stoppable 
     }
 
     @Override
-    public void releaseCurrentProjectLocks() {
+    public void runAsIsolatedTask() {
         Collection<? extends ResourceLock> projectLocks = getCurrentProjectLocks();
         releaseLocks(projectLocks);
         releaseLocks(taskLockRegistry.getResourceLocksByCurrentThread());
@@ -189,14 +189,18 @@ public class DefaultWorkerLeaseService implements WorkerLeaseService, Stoppable 
     }
 
     @Override
-    public void withoutProjectLock(Runnable runnable) {
-        withoutProjectLock(Factories.toFactory(runnable));
+    public void runAsIsolatedTask(Runnable runnable) {
+        runAsIsolatedTask(Factories.toFactory(runnable));
     }
 
     @Override
-    public <T> T withoutProjectLock(Factory<T> factory) {
+    public <T> T runAsIsolatedTask(Factory<T> factory) {
         Collection<? extends ResourceLock> projectLocks = getCurrentProjectLocks();
-        return withoutLocks(projectLocks, factory);
+        Collection<? extends ResourceLock> taskLocks = taskLockRegistry.getResourceLocksByCurrentThread();
+        List<ResourceLock> locks = new ArrayList<ResourceLock>(projectLocks.size() + taskLocks.size());
+        locks.addAll(projectLocks);
+        locks.addAll(taskLocks);
+        return withoutLocks(locks, factory);
     }
 
     @Override

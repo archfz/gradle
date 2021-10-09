@@ -463,7 +463,7 @@ public class DefaultProjectStateRegistry implements ProjectStateRegistry {
             }
 
             // Another thread holds the update lock, release the project locks and wait for the other thread to finish the update
-            projectLeaseRegistry.withoutProjectLock(lock::lock);
+            projectLeaseRegistry.blocking(lock::lock);
         }
 
         private void assertCanMutate() {

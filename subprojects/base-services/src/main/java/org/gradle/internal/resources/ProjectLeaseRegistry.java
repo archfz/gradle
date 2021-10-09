@@ -48,11 +48,12 @@ public interface ProjectLeaseRegistry {
     Collection<? extends ResourceLock> getCurrentProjectLocks();
 
     /**
-     * Releases any project state locks or task execution locks currently held by this thread.
+     * Releases any project state locks or task execution locks currently held by this thread, allowing the current
+     * thread to run as if it were executing an isolated task.
      *
      * Does not release worker lease.
      */
-    void releaseCurrentProjectLocks();
+    void runAsIsolatedTask();
 
     /**
      * Returns {@code true} when this registry grants multiple threads access to projects (but no more than one thread per given project)
@@ -61,20 +62,20 @@ public interface ProjectLeaseRegistry {
     boolean getAllowsParallelExecution();
 
     /**
-     * Releases all project locks held by the current thread and executes the {@link Factory}.  Upon completion of the
-     * {@link Factory}, if a lock was held at the time the method was called, then it will be reacquired.  If no locks were held at the
-     * time the method was called, then no attempt will be made to reacquire a lock on completion.  While blocking to reacquire the project
-     * lock, all worker leases held by the thread will be released and reacquired once the project lock is obtained.
+     * Releases any project state locks or task execution locks currently held by the current thread and executes the {@link Factory}.
+     * Upon completion of the {@link Factory}, if a lock was held at the time the method was called, then it will be reacquired.
+     * If no locks were held at the time the method was called, then no attempt will be made to reacquire a lock on completion.
+     * While blocking to reacquire the project lock, all worker leases held by the thread will be released and reacquired once the project lock is obtained.
      */
-    <T> T withoutProjectLock(Factory<T> action);
+    <T> T runAsIsolatedTask(Factory<T> action);
 
     /**
-     * Releases all project locks held by the current thread and executes the {@link Runnable}.  Upon completion of the
-     * {@link Runnable}, if a lock was held at the time the method was called, then it will be reacquired.  If no locks were held at the
-     * time the method was called, then no attempt will be made to reacquire a lock on completion.  While blocking to reacquire the project
-     * lock, all worker leases held by the thread will be released and reacquired once the project lock is obtained.
+     * Releases any project state locks or task execution locks currently held by the current thread and executes the {@link Factory}.
+     * Upon completion of the {@link Runnable}, if a lock was held at the time the method was called, then it will be reacquired.
+     * If no locks were held at the time the method was called, then no attempt will be made to reacquire a lock on completion.
+     * While blocking to reacquire the project lock, all worker leases held by the thread will be released and reacquired once the project lock is obtained.
      */
-    void withoutProjectLock(Runnable action);
+    void runAsIsolatedTask(Runnable action);
 
     /**
      * Allows the given code to access the mutable state of any project, regardless of which other threads may be accessing the project.
