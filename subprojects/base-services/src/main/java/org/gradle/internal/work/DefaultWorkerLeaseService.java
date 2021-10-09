@@ -190,11 +190,24 @@ public class DefaultWorkerLeaseService implements WorkerLeaseService, Stoppable 
     @Override
     public void blocking(Runnable action) {
         if (projectLockRegistry.mayAttemptToChangeLocks()) {
-            final Collection<? extends ResourceLock> projectLocks = getCurrentProjectLocks();
-            if (!projectLocks.isEmpty()) {
+
+            // Determine which project locks, if any, to release while waiting for a blocking action to complete
+            // When parallel execution is enabled, release all project locks and the "all projects" lock, so that other work that is
+            // waiting on some project can run
+            // When parallel execution is disabled, only release the "all projects" lock
+            Collection<? extends ResourceLock> projectLocksToRelease = getCurrentProjectLocks();
+            if (!getAllowsParallelExecution()) {
+                if (projectLocksToRelease.contains(projectLockRegistry.getAllProjectsLock())) {
+                    projectLocksToRelease = Collections.singletonList(projectLockRegistry.getAllProjectsLock());
+                } else {
+                    projectLocksToRelease = Collections.emptyList();
+                }
+            }
+
+            if (!projectLocksToRelease.isEmpty()) {
                 // Need to run the action without the project locks and the worker lease
-                List<ResourceLock> locks = new ArrayList<ResourceLock>(projectLocks.size() + 1);
-                locks.addAll(projectLocks);
+                List<ResourceLock> locks = new ArrayList<ResourceLock>(projectLocksToRelease.size() + 1);
+                locks.addAll(projectLocksToRelease);
                 locks.add(getCurrentWorkerLease());
                 releaseLocks(locks);
                 try {
@@ -205,7 +218,8 @@ public class DefaultWorkerLeaseService implements WorkerLeaseService, Stoppable 
                 }
             }
         }
-        // Else, release only the worker lease
+
+        // Else, don't need to release any project locks, so release only the worker lease
         List<? extends ResourceLock> locks = Collections.singletonList(getCurrentWorkerLease());
         releaseLocks(locks);
         try {
